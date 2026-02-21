@@ -112,19 +112,47 @@ function validateHtmlMeta(
   return warnings.filter(Boolean);
 }
 
-/**
- * Validates SEO metadata for every HTML page in dist.
- */
-export async function validateMeta(dirPath, options) {
-  const { checkedPages, warnings } = await runHtmlValidation({
-    dirPath,
-    validatePage: ({ html }) => validateHtmlMeta(html, options),
-  });
+export class MetaValidator {
+  constructor({
+    metaTitleMinLength,
+    metaTitleMaxLength,
+    metaDescriptionMinLength,
+    metaDescriptionMaxLength,
+  } = {}) {
+    this.config = {
+      metaTitleMinLength,
+      metaTitleMaxLength,
+      metaDescriptionMinLength,
+      metaDescriptionMaxLength,
+    };
+  }
 
-  return {
-    name: 'meta',
-    label: 'SEO metadata',
-    checkedPages,
-    warnings,
-  };
+  validatePage(html) {
+    return validateHtmlMeta(html, this.config);
+  }
+
+  /**
+   * Validates SEO metadata for every HTML page in dist.
+   */
+  async validate(dirPath) {
+    const { checkedPages, warnings } = await runHtmlValidation({
+      dirPath,
+      validatePage: ({ html }) => this.validatePage(html),
+    });
+
+    return {
+      name: 'meta',
+      label: 'SEO metadata',
+      checkedPages,
+      warnings,
+    };
+  }
+}
+
+/**
+ * Backward-compatible function wrapper for existing integrations.
+ */
+export async function validateMeta(dirPath, options = {}) {
+  const validator = new MetaValidator(options);
+  return validator.validate(dirPath);
 }

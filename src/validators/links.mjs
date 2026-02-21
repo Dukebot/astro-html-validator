@@ -56,26 +56,46 @@ async function internalUrlExists(dirPath, urlPath) {
 /**
  * Reports broken internal links for each generated HTML page.
  */
-export async function validateLinks(dirPath) {
-  const { checkedPages, warnings } = await runHtmlValidation({
-    dirPath,
-    validatePage: async ({ html }) => {
-      const pageWarnings = [];
-      const urls = extractInternalUrls(html);
+export class LinksValidator {
+  constructor({
+    // Reserved for future options.
+  } = {}) {
+    this.config = {
+      // Reserved for future options.
+    };
+  }
 
-      for (const url of urls) {
-        const exists = await internalUrlExists(dirPath, url);
-        if (!exists) pageWarnings.push(`Internal link not found: ${url}`);
-      }
+  async validatePage({ html, dirPath }) {
+    const pageWarnings = [];
+    const urls = extractInternalUrls(html);
 
-      return pageWarnings;
-    },
-  });
+    for (const url of urls) {
+      const exists = await internalUrlExists(dirPath, url);
+      if (!exists) pageWarnings.push(`Internal link not found: ${url}`);
+    }
 
-  return {
-    name: 'links',
-    label: 'Internal links',
-    checkedPages,
-    warnings,
-  };
+    return pageWarnings;
+  }
+
+  async validate(dirPath) {
+    const { checkedPages, warnings } = await runHtmlValidation({
+      dirPath,
+      validatePage: ({ html }) => this.validatePage({ html, dirPath }),
+    });
+
+    return {
+      name: 'links',
+      label: 'Internal links',
+      checkedPages,
+      warnings,
+    };
+  }
+}
+
+/**
+ * Backward-compatible function wrapper for existing integrations.
+ */
+export async function validateLinks(dirPath, options = {}) {
+  const validator = new LinksValidator(options);
+  return validator.validate(dirPath);
 }

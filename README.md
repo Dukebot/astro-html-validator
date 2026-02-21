@@ -61,7 +61,12 @@ import { Validator } from '@dukebot/astro-html-validator';
 const validator = new Validator({
   dirPath: path.resolve(process.cwd(), 'dist'),
   config: {
-    jsonld: {},
+    jsonld: {
+      requireHtmlLang: true,
+      requireInLanguage: true,
+      disallowEmptyInLanguage: true,
+      requireLangMatch: true,
+    },
     links: {},
     meta: {
       metaTitleMinLength: 30,
@@ -76,6 +81,17 @@ const validator = new Validator({
 const results = await validator.run({ selector: 'all' });
 console.log(results);
 ```
+
+### JSON-LD language consistency options
+
+`config.jsonld` now supports optional checks to validate language consistency between `<html lang="...">` and JSON-LD `inLanguage` values:
+
+- `requireHtmlLang` (default: `false`)
+- `requireInLanguage` (default: `false`)
+- `disallowEmptyInLanguage` (default: `false`)
+- `requireLangMatch` (default: `false`)
+
+When enabled, warnings are reported through the normal validator output (`[WARN] /route -> ...`) so existing integrations remain backward-compatible.
 
 ---
 
@@ -109,6 +125,7 @@ Quick steps:
    ```bash
    npm publish --access public
    ```
+
 
 
 
