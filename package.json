@@ -1,0 +1,39 @@
+{
+  "name": "@dukebot/astro-html-validator",
+  "version": "1.0.0",
+  "description": "Validate Astro-generated HTML output for SEO metadata, JSON-LD, and internal links.",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./validator": "./src/validator.mjs"
+  },
+  "bin": {
+    "astro-html-validator": "bin/cli.mjs"
+  },
+  "files": [
+    "src/**/*.mjs",
+    "bin/cli.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "node ./bin/cli.mjs --help",
+    "validate:dist": "node ./bin/cli.mjs"
+  },
+  "keywords": [
+    "astro",
+    "seo",
+    "validator",
+    "html",
+    "jsonld"
+  ],
+  "author": "Dukebot",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
