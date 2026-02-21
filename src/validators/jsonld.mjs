@@ -1,111 +1,38 @@
-import { runHtmlValidation } from '../utils.mjs';
+import { Validator } from '../validator.mjs';
+import {
+  collectInLanguageValues,
+  extractHtmlLang,
+  getGraphNodes,
+  getJsonLdBlocks,
+  hasEmptyInLanguage,
+  hasHtmlLang,
+} from '../utils/jsonld.mjs';
 
-function extractHtmlLang(html) {
-  const match = html.match(/<html[^>]*\blang=["']([^"']+)["']/i);
-  return match?.[1]?.trim() ?? '';
-}
-
-function collectInLanguageValues(node, out = []) {
-  if (Array.isArray(node)) {
-    for (const item of node) collectInLanguageValues(item, out);
-    return out;
-  }
-
-  if (!node || typeof node !== 'object') return out;
-
-  if (Object.hasOwn(node, 'inLanguage')) {
-    out.push(node.inLanguage);
-  }
-
-  for (const value of Object.values(node)) {
-    collectInLanguageValues(value, out);
-  }
-
-  return out;
-}
-
-function hasEmptyInLanguage(values) {
-  return values.some((value) => {
-    if (value == null) return true;
-    if (typeof value === 'string') return value.trim().length === 0;
-    if (Array.isArray(value)) {
-      return value.some((item) => {
-        if (item == null) return true;
-        if (typeof item !== 'string') return false;
-        return item.trim().length === 0;
-      });
-    }
-    return false;
-  });
-}
-
-function hasHtmlLang(values, htmlLang) {
-  const normalizedHtmlLang = htmlLang.trim().toLowerCase();
-
-  return values.some((value) => {
-    if (typeof value === 'string') {
-      return value.trim().toLowerCase() === normalizedHtmlLang;
-    }
-
-    if (Array.isArray(value)) {
-      return value.some(
-        (item) => typeof item === 'string' && item.trim().toLowerCase() === normalizedHtmlLang
-      );
-    }
-
-    return false;
-  });
-}
-
-/**
- * Extracts and parses JSON-LD script blocks from a page.
- */
-function getJsonLdBlocks(html) {
-  const regex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  const blocks = [];
-  let match;
-
-  while ((match = regex.exec(html)) !== null) {
-    const raw = match[1]?.trim();
-    if (!raw) continue;
-    try {
-      blocks.push(JSON.parse(raw));
-    } catch {
-      blocks.push({ __parseError: true, __raw: raw });
-    }
-  }
-
-  return blocks;
-}
-
-/**
- * Flattens top-level JSON-LD nodes and @graph nodes into one list.
- */
-function getGraphNodes(blocks) {
-  const nodes = [];
-  for (const block of blocks) {
-    if (block.__parseError) continue;
-    if (Array.isArray(block['@graph'])) nodes.push(...block['@graph']);
-    else nodes.push(block);
-  }
-  return nodes;
-}
-
-export class JsonldValidator {
+export class JsonldValidator extends Validator {
+  /**
+   * Stores JSON-LD language consistency options for this validator instance.
+   */
   constructor({
     requireHtmlLang = false,
     requireInLanguage = false,
     disallowEmptyInLanguage = false,
     requireLangMatch = false,
   } = {}) {
-    this.config = {
-      requireHtmlLang,
-      requireInLanguage,
-      disallowEmptyInLanguage,
-      requireLangMatch,
-    };
+    super({
+      name: 'jsonld',
+      label: 'JSON-LD',
+      config: {
+        requireHtmlLang,
+        requireInLanguage,
+        disallowEmptyInLanguage,
+        requireLangMatch,
+      },
+    });
   }
 
+  /**
+   * Applies language-related JSON-LD checks for one parsed HTML page.
+   */
   validateJsonLdLanguage({ html, nodes }) {
     const warnings = [];
     const htmlLang = extractHtmlLang(html);
@@ -132,7 +59,10 @@ export class JsonldValidator {
     return warnings;
   }
 
-  validatePage(html) {
+  /**
+   * Validates JSON-LD structure and optional language consistency for one page.
+   */
+  validatePage({ html }) {
     const pageWarnings = [];
     const blocks = getJsonLdBlocks(html);
 
@@ -156,29 +86,6 @@ export class JsonldValidator {
     pageWarnings.push(...this.validateJsonLdLanguage({ html, nodes }));
     return pageWarnings;
   }
-
-  /**
-   * Validates JSON-LD presence/basic parseability for each HTML page.
-   */
-  async validate(dirPath) {
-    const { checkedPages, warnings } = await runHtmlValidation({
-      dirPath,
-      validatePage: ({ html }) => this.validatePage(html),
-    });
-
-    return {
-      name: 'jsonld',
-      label: 'JSON-LD',
-      checkedPages,
-      warnings,
-    };
-  }
 }
 
-/**
- * Backward-compatible function wrapper for existing integrations.
- */
-export async function validateJsonld(dirPath, options = {}) {
-  const validator = new JsonldValidator(options);
-  return validator.validate(dirPath);
-}
+export default JsonldValidator
