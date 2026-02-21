@@ -82,6 +82,12 @@ const results = await validator.run({ selector: 'all' });
 console.log(results);
 ```
 
+### Architecture (current)
+
+- `src/index.mjs` exports the coordinator class (`Validator`) that orchestrates all checks.
+- `src/validator.mjs` now contains the **base validator class** used via inheritance by concrete validators.
+- Each concrete validator (`jsonld`, `links`, `meta`) encapsulates its own config and page-level validation.
+
 ### JSON-LD language consistency options
 
 `config.jsonld` now supports optional checks to validate language consistency between `<html lang="...">` and JSON-LD `inLanguage` values:
@@ -114,6 +120,7 @@ When enabled, warnings are reported through the normal validator output (`[WARN]
 Quick steps:
 
 1. Update `name`, `author`, and `version` in `package.json`.
+   - For this release, use a **major bump** (breaking changes accepted).
 2. Sign in:
 
    ```bash
@@ -125,6 +132,11 @@ Quick steps:
    ```bash
    npm publish --access public
    ```
+
+### Breaking change note
+
+`@dukebot/astro-html-validator/validator` now points to the **base validator class** (`src/validator.mjs`) instead of the previous coordinator implementation.
+
 
 
 
