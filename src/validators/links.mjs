@@ -9,13 +9,13 @@ export class LinksValidator extends Validator {
    * Initializes link validator configuration (reserved for future rules).
    */
   constructor({
-    // Reserved for future options.
+    absoluteUrlPrefixes = [],
   } = {}) {
     super({
       name: 'links',
       label: 'Internal links',
       config: {
-        // Reserved for future options.
+        absoluteUrlPrefixes,
       },
     });
   }
@@ -25,7 +25,9 @@ export class LinksValidator extends Validator {
    */
   async validatePage({ html, dirPath }) {
     const pageWarnings = [];
-    const urls = extractInternalUrls(html);
+    const urls = extractInternalUrls(html, {
+      absoluteUrlPrefixes: this.config.absoluteUrlPrefixes,
+    });
 
     for (const url of urls) {
       const exists = await internalUrlExists(dirPath, url);

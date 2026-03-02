@@ -46,6 +46,8 @@ astro-html-validator [selector] [options]
 
 Options:
   --dir <path>      Path to the dist directory (default: <cwd>/dist)
+  --links-absolute-prefixes <list>
+                    Comma-separated absolute URL prefixes treated as local routes
   --quiet           Disable summary output
   --help            Show help
 ```
@@ -67,7 +69,9 @@ const validator = new Validator({
       disallowEmptyInLanguage: true,
       requireLangMatch: true,
     },
-    links: {},
+    links: {
+      absoluteUrlPrefixes: ['https://example.com', 'https://www.example.com'],
+    },
     meta: {
       metaTitleMinLength: 30,
       metaTitleMaxLength: 60,
@@ -81,6 +85,17 @@ const validator = new Validator({
 const results = await validator.run({ selector: 'all' });
 console.log(results);
 ```
+
+### Internal links: absolute-to-local prefix mapping
+
+The `links` validator can treat some absolute URLs as local internal routes.
+
+If `absoluteUrlPrefixes` contains your site domains, links like:
+
+- `https://example.com/about`
+- `https://www.example.com/contact?utm=x#team`
+
+are normalized to local paths (`/about`, `/contact`) and validated against `dist`.
 
 ### Architecture (current)
 
@@ -136,6 +151,7 @@ Quick steps:
 ### Breaking change note
 
 `@dukebot/astro-html-validator/validator` now points to the **base validator class** (`src/validator.mjs`) instead of the previous coordinator implementation.
+
 
 
 

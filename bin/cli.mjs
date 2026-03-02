@@ -18,6 +18,8 @@ Selector:
 
 Options:
   --dir <path>      Path to the dist directory (default: ./dist)
+  --links-absolute-prefixes <list>
+                    Comma-separated absolute URL prefixes treated as local
   --quiet           Disable printed summary output
   --help            Show help
 
@@ -25,6 +27,7 @@ Examples:
   astro-html-validator
   astro-html-validator meta
   astro-html-validator links --dir ./dist
+  astro-html-validator links --links-absolute-prefixes https://example.com,https://www.example.com
   astro-html-validator jsonld,meta
 `);
 }
@@ -36,6 +39,7 @@ function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     selector: 'all',
     dirPath: path.resolve(process.cwd(), 'dist'),
+    linksAbsolutePrefixes: [],
     print: true,
     help: false,
   };
@@ -67,6 +71,17 @@ function parseArgs(argv = process.argv.slice(2)) {
       continue;
     }
 
+    if (arg === '--links-absolute-prefixes') {
+      const next = argv[index + 1];
+      if (!next) throw new Error('Missing value for --links-absolute-prefixes');
+      options.linksAbsolutePrefixes = next
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      index += 1;
+      continue;
+    }
+
     throw new Error(`Unknown argument: ${arg}`);
   }
 
@@ -88,7 +103,11 @@ async function main() {
 
   const validator = new Validator({
     dirPath: parsed.dirPath,
-    config: {},
+    config: {
+      links: {
+        absoluteUrlPrefixes: parsed.linksAbsolutePrefixes,
+      },
+    },
     print: parsed.print,
   });
 
