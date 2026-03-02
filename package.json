@@ -1,6 +1,6 @@
 {
   "name": "@dukebot/astro-html-validator",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Validate Astro-generated HTML output for SEO metadata, JSON-LD, and internal links.",
   "type": "module",
   "main": "./src/index.mjs",
@@ -19,6 +19,8 @@
   ],
   "scripts": {
     "check": "node ./bin/cli.mjs --help",
+    "test": "node --test",
+    "test:links": "node --test tests/links-utils.test.mjs",
     "validate:dist": "node ./bin/cli.mjs"
   },
   "keywords": [
