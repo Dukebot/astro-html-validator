@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { parse } from 'parse5';
 import { pathExists } from './common.mjs';
 
 /**
@@ -30,15 +31,34 @@ function toLocalPathFromAbsolute(rawUrl, absolutePrefixes) {
 }
 
 /**
- * Removes non-rendered sections to avoid false positives when extracting links.
+ * Collects href/src attribute values from parsed HTML element nodes.
  */
-function sanitizeHtmlForLinkExtraction(html = '') {
-  if (!html) return '';
+function collectHtmlLinkAttributes(html = '') {
+  if (!html) return [];
 
-  return html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, '');
+  const urls = [];
+  const document = parse(html, { sourceCodeLocationInfo: false });
+  const queue = [document];
+
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node) continue;
+
+    if (Array.isArray(node.attrs)) {
+      for (const attr of node.attrs) {
+        if (!attr?.name || !attr?.value) continue;
+        if (attr.name !== 'href' && attr.name !== 'src') continue;
+        urls.push(attr.value);
+      }
+    }
+
+    if (node.content) queue.push(node.content);
+    if (Array.isArray(node.childNodes) && node.childNodes.length > 0) {
+      queue.push(...node.childNodes);
+    }
+  }
+
+  return urls;
 }
 
 /**
@@ -46,47 +66,35 @@ function sanitizeHtmlForLinkExtraction(html = '') {
  */
 export function extractInternalUrls(html, { absoluteUrlPrefixes = [] } = {}) {
   const urls = new Set();
-  const tagRegex = /<[^>]+>/g;
-  const attrRegex = /\b(?:href|src)\s*=\s*["']([^"']+)["']/gi;
   const absolutePrefixes = normalizeAbsolutePrefixes(absoluteUrlPrefixes);
-  const safeHtml = sanitizeHtmlForLinkExtraction(html);
 
-  let tagMatch;
-  while ((tagMatch = tagRegex.exec(safeHtml)) !== null) {
-    const tag = tagMatch[0];
-    if (!tag || tag.startsWith('</')) continue;
+  for (const value of collectHtmlLinkAttributes(html)) {
+    const raw = value?.trim();
+    if (!raw) continue;
 
-    let attrMatch;
-    while ((attrMatch = attrRegex.exec(tag)) !== null) {
-      const raw = attrMatch[1]?.trim();
-      if (!raw) continue;
-
-      if (
-        raw.startsWith('//') ||
-        raw.startsWith('#') ||
-        raw.startsWith('mailto:') ||
-        raw.startsWith('tel:') ||
-        raw.startsWith('javascript:') ||
-        raw.startsWith('data:')
-      ) {
-        continue;
-      }
-
-      const clean = raw.split(/[?#]/)[0];
-      if (!clean) continue;
-
-      if (clean.startsWith('/')) {
-        urls.add(clean);
-        continue;
-      }
-
-      if (clean.startsWith('http://') || clean.startsWith('https://')) {
-        const localPath = toLocalPathFromAbsolute(clean, absolutePrefixes);
-        if (localPath) urls.add(localPath);
-      }
+    if (
+      raw.startsWith('//') ||
+      raw.startsWith('#') ||
+      raw.startsWith('mailto:') ||
+      raw.startsWith('tel:') ||
+      raw.startsWith('javascript:') ||
+      raw.startsWith('data:')
+    ) {
+      continue;
     }
 
-    attrRegex.lastIndex = 0;
+    const clean = raw.split(/[?#]/)[0];
+    if (!clean) continue;
+
+    if (clean.startsWith('/')) {
+      urls.add(clean);
+      continue;
+    }
+
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      const localPath = toLocalPathFromAbsolute(clean, absolutePrefixes);
+      if (localPath) urls.add(localPath);
+    }
   }
 
   return [...urls];
