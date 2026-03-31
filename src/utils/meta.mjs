@@ -1,4 +1,70 @@
-import { getAttr } from './common.mjs';
+import { parse } from 'parse5';
+
+function parseHtmlDocument(html = '') {
+  if (!html) return null;
+  return parse(html, { sourceCodeLocationInfo: false });
+}
+
+function getAttrValue(node, attrName) {
+  if (!Array.isArray(node?.attrs)) return '';
+  const attr = node.attrs.find((item) => item?.name?.toLowerCase() === attrName.toLowerCase());
+  return attr?.value?.trim() ?? '';
+}
+
+function findFirstNode(root, predicate) {
+  if (!root) return null;
+
+  const queue = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node) continue;
+    if (predicate(node)) return node;
+
+    if (node.content) queue.push(node.content);
+    if (Array.isArray(node.childNodes) && node.childNodes.length > 0) {
+      queue.push(...node.childNodes);
+    }
+  }
+
+  return null;
+}
+
+function getNodeText(node) {
+  if (!node) return '';
+
+  let text = '';
+  const queue = [node];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+
+    if (current.nodeName === '#text' && typeof current.value === 'string') {
+      text += current.value;
+    }
+
+    if (current.content) queue.push(current.content);
+    if (Array.isArray(current.childNodes) && current.childNodes.length > 0) {
+      queue.push(...current.childNodes);
+    }
+  }
+
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function getMetaNode(document, name, isProperty = false) {
+  const attrName = isProperty ? 'property' : 'name';
+  const normalizedExpected = String(name).trim().toLowerCase();
+
+  return findFirstNode(document, (node) => {
+    if (node?.tagName !== 'meta') return false;
+    const key = getAttrValue(node, attrName).toLowerCase();
+    return key === normalizedExpected;
+  });
+}
+
+function getStringLength(value) {
+  return Array.from(value.normalize('NFC')).length;
+}
 
 // Core metadata tags expected on every page.
 export const REQUIRED_META_CHECKS = [
@@ -16,39 +82,29 @@ export const REQUIRED_META_CHECKS = [
  * Returns whether a meta tag exists with the expected key and non-empty content.
  */
 export function hasMeta(html, name, isProperty = false) {
-  const tags = html.match(/<meta\b[^>]*>/gi) || [];
-  return tags.some((tag) => {
-    const key = isProperty ? getAttr(tag, 'property') : getAttr(tag, 'name');
-    if (!key || key !== name) return false;
-    const content = getAttr(tag, 'content');
-    return !!content;
-  });
+  return !!getMetaContent(html, name, isProperty);
 }
 
 /**
  * Returns the `content` value for a meta tag by name/property.
  */
 export function getMetaContent(html, name, isProperty = false) {
-  const tags = html.match(/<meta\b[^>]*>/gi) || [];
-  for (const tag of tags) {
-    const key = isProperty ? getAttr(tag, 'property') : getAttr(tag, 'name');
-    if (!key || key !== name) continue;
-    const content = getAttr(tag, 'content');
-    if (content) return content;
-  }
-  return '';
+  const document = parseHtmlDocument(html);
+  const node = getMetaNode(document, name, isProperty);
+  return getAttrValue(node, 'content');
 }
 
 /**
  * Checks that a canonical link tag exists with a non-empty href.
  */
 export function hasCanonical(html) {
-  const links = html.match(/<link\b[^>]*>/gi) || [];
-  return links.some((tag) => {
-    const rel = getAttr(tag, 'rel');
-    if (!rel || rel.toLowerCase() !== 'canonical') return false;
-    const href = getAttr(tag, 'href');
-    return !!href;
+  const document = parseHtmlDocument(html);
+
+  return !!findFirstNode(document, (node) => {
+    if (node?.tagName !== 'link') return false;
+    const rel = getAttrValue(node, 'rel').toLowerCase();
+    if (rel !== 'canonical') return false;
+    return !!getAttrValue(node, 'href');
   });
 }
 
@@ -56,8 +112,9 @@ export function hasCanonical(html) {
  * Extracts the document title text.
  */
 export function getTitleContent(html) {
-  const match = html.match(/<title>([^<]+)<\/title>/i);
-  return match?.[1]?.trim() ?? '';
+  const document = parseHtmlDocument(html);
+  const titleNode = findFirstNode(document, (node) => node?.tagName === 'title');
+  return getNodeText(titleNode);
 }
 
 /**
@@ -65,8 +122,10 @@ export function getTitleContent(html) {
  */
 export function validateLengthRange({ value, min = 1, max = Infinity, fieldLabel }) {
   if (!value) return;
-  if (value.length >= min && value.length <= max) return;
-  return `Recommended ${fieldLabel} length is ${min}-${max}. Current: ${value.length}.`;
+
+  const length = getStringLength(value);
+  if (length >= min && length <= max) return;
+  return `Recommended ${fieldLabel} length is ${min}-${max}. Current: ${length}.`;
 }
 
 /**
